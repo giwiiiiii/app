@@ -35,7 +35,7 @@ client.on('interactionCreate', async (interaction) => {
 
     const membersInput = new TextInputBuilder()
       .setCustomId('channel_members')
-      .setLabel('参加メンバー（@userA @userB）')
+      .setLabel('参加メンバー（入力例：@userA @userB）')
       .setStyle(TextInputStyle.Paragraph);
 
     const row1 = new ActionRowBuilder().addComponents(nameInput);
