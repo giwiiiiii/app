@@ -11,7 +11,7 @@ app.get('/keepalive', (req, res) => res.send('OK'));
 app.listen(PORT, () => console.log(`Keepalive running on port ${PORT}`));
 
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages],
+  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
   partials: [Partials.Channel],
 });
 
