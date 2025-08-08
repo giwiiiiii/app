@@ -1,4 +1,3 @@
-// app/index.js
 import express from 'express';
 import { Client, GatewayIntentBits, Partials, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, ChannelType, PermissionsBitField } from 'discord.js';
 import dotenv from 'dotenv';
@@ -11,7 +10,12 @@ app.get('/keepalive', (req, res) => res.send('OK'));
 app.listen(PORT, () => console.log(`Keepalive running on port ${PORT}`));
 
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages],
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.GuildMembers
+  ],
   partials: [Partials.Channel],
 });
 
@@ -23,6 +27,7 @@ client.once('ready', () => {
 });
 
 client.on('interactionCreate', async (interaction) => {
+  // 申請ボタン押下時
   if (interaction.isButton() && interaction.customId === 'open-request-modal') {
     const modal = new ModalBuilder()
       .setCustomId('channel-request-modal')
@@ -35,7 +40,7 @@ client.on('interactionCreate', async (interaction) => {
 
     const membersInput = new TextInputBuilder()
       .setCustomId('channel_members')
-      .setLabel('参加メンバー（入力例：@userA @userB）')
+      .setLabel('参加メンバー（例：@userA @userB または 名前）')
       .setStyle(TextInputStyle.Paragraph);
 
     const row1 = new ActionRowBuilder().addComponents(nameInput);
@@ -45,13 +50,33 @@ client.on('interactionCreate', async (interaction) => {
     await interaction.showModal(modal);
   }
 
+  // モーダル送信時
   if (interaction.isModalSubmit() && interaction.customId === 'channel-request-modal') {
     const channelName = interaction.fields.getTextInputValue('channel_name');
     const membersRaw = interaction.fields.getTextInputValue('channel_members');
 
-    // メンションからユーザーID抽出
-    const userIds = [...membersRaw.matchAll(/<@!?(\d+)>/g)].map(m => m[1]);
-    userIds.push(interaction.user.id); // 申請者自身
+    // 1. メンション形式からユーザーID抽出
+    let userIds = [...membersRaw.matchAll(/<@!?(\d+)>/g)].map(m => m[1]);
+
+    // 2. 名前で入力されたものをメンバーリストから検索
+    const names = membersRaw
+      .split(/\s+/)
+      .filter(n => !n.match(/<@!?(\d+)>/));
+
+    for (const name of names) {
+      const member = interaction.guild.members.cache.find(
+        m => m.user.username === name || m.displayName === name
+      );
+      if (member) {
+        userIds.push(member.id);
+      }
+    }
+
+    // 3. 申請者自身も追加
+    userIds.push(interaction.user.id);
+
+    // 4. 重複削除
+    userIds = [...new Set(userIds)];
 
     const permissionOverwrites = [
       {
@@ -82,6 +107,7 @@ client.on('interactionCreate', async (interaction) => {
   }
 });
 
+// 管理者が申請ボタンを設置するコマンド
 client.on('messageCreate', async (msg) => {
   if (msg.content === '!setup-button' && msg.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
     const row = new ActionRowBuilder().addComponents(
