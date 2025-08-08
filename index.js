@@ -64,13 +64,11 @@ client.on('interactionCreate', async (interaction) => {
       .filter(n => !n.match(/<@!?(\d+)>/)); // メンションじゃない
 
     for (const name of names) {
-      const member = interaction.guild.members.cache.find(
-        m => m.user.username === name || m.displayName === name
-      );
+      const member = await interaction.guild.members.fetch({ query: name, limit: 1 }).then(members => members.first());
       if (member) {
         userIds.push(member.id);
+        }
       }
-    }
 
     // 3. 申請者自身も追加
     userIds.push(interaction.user.id);
