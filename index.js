@@ -40,7 +40,7 @@ client.on('interactionCreate', async (interaction) => {
 
     const membersInput = new TextInputBuilder()
       .setCustomId('channel_members')
-      .setLabel('参加メンバー（例：@userA @userB または 名前）')
+      .setLabel('参加メンバーをIDを入力（例：userA userB userC）')
       .setStyle(TextInputStyle.Paragraph);
 
     const row1 = new ActionRowBuilder().addComponents(nameInput);
@@ -59,7 +59,7 @@ client.on('interactionCreate', async (interaction) => {
     let userIds = [...membersRaw.matchAll(/<@!?(\d+)>/g)].map(m => m[1]);
 
     // 2. 名前で入力されたものをメンバーリストから検索
-    const names = membersRaw
+    /*const names = membersRaw
       .split(/\s+/)
       .filter(n => !n.match(/<@!?(\d+)>/)); // メンションじゃない
 
@@ -68,7 +68,7 @@ client.on('interactionCreate', async (interaction) => {
       if (member) {
         userIds.push(member.id);
         }
-      }
+      }*/
 
     // 3. 申請者自身も追加
     userIds.push(interaction.user.id);
