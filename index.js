@@ -59,7 +59,7 @@ client.on('interactionCreate', async (interaction) => {
     let userIds = [...membersRaw.matchAll(/<@!?(\d+)>/g)].map(m => m[1]);
 
     // 2. 名前で入力されたものをメンバーリストから検索
-    /*const names = membersRaw
+    const names = membersRaw
       .split(/\s+/)
       .filter(n => !n.match(/<@!?(\d+)>/)); // メンションじゃない
 
@@ -68,7 +68,7 @@ client.on('interactionCreate', async (interaction) => {
       if (member) {
         userIds.push(member.id);
         }
-      }*/
+      }
 
     // 3. 申請者自身も追加
     userIds.push(interaction.user.id);
