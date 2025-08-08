@@ -10,7 +10,12 @@ app.get('/keepalive', (req, res) => res.send('OK'));
 app.listen(PORT, () => console.log(`Keepalive running on port ${PORT}`));
 
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages],
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.GuildMembers
+  ],
   partials: [Partials.Channel],
 });
 
@@ -56,7 +61,7 @@ client.on('interactionCreate', async (interaction) => {
     // 2. 名前で入力されたものをメンバーリストから検索
     const names = membersRaw
       .split(/\s+/)
-      .filter(n => !n.match(/<@!?(\d+)>/));
+      .filter(n => !n.match(/<@!?(\d+)>/)); // メンションじゃない
 
     for (const name of names) {
       const member = interaction.guild.members.cache.find(
