@@ -1,8 +1,15 @@
 import {
-  Client, GatewayIntentBits, Partials,
-  ChannelType, PermissionsBitField,
-  ActionRowBuilder, ButtonBuilder, ButtonStyle,
-  ModalBuilder, TextInputBuilder, TextInputStyle,
+  Client,
+  GatewayIntentBits,
+  Partials,
+  ChannelType,
+  PermissionsBitField,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
 } from 'discord.js';
 import express from 'express';
 import dotenv from 'dotenv';
@@ -18,30 +25,39 @@ const client = new Client({
   partials: [Partials.Channel],
 });
 
-// keepalive（公開不要）
+// ===== Keepalive用（公開不要） =====
 const app = express();
 app.get('/keepalive', (_, res) => res.send('ok'));
 app.listen(process.env.PORT || 3000, () => console.log('Keepalive server running'));
 
+// ===== Ready =====
 client.once('ready', () => {
   console.log(`✅ Logged in as ${client.user.tag}`);
 });
 
-// 設置用コマンド：!setup-button
+// ===== 管理者が設置するコマンド =====
 client.on('messageCreate', async (message) => {
   if (message.content === '!setup-button') {
     if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) return;
+
     const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('setup-button').setLabel('チャンネル申請').setStyle(ButtonStyle.Primary)
+      new ButtonBuilder()
+        .setCustomId('setup-button')
+        .setLabel('チャンネル申請')
+        .setStyle(ButtonStyle.Primary)
     );
-    await message.channel.send({ content: 'プライベートチャンネルを申請するには下を押してください。', components: [row] });
+
+    await message.channel.send({
+      content: 'プライベートチャンネルを申請するには下のボタンを押してください。',
+      components: [row],
+    });
   }
 });
 
-// 申請→モーダル→作成
+// ===== インタラクション処理 =====
 client.on('interactionCreate', async (interaction) => {
   try {
-    // ボタン：モーダル表示
+    // ボタン → モーダル表示
     if (interaction.isButton() && interaction.customId === 'setup-button') {
       const modal = new ModalBuilder()
         .setCustomId('channel-request-modal')
@@ -53,7 +69,6 @@ client.on('interactionCreate', async (interaction) => {
         .setStyle(TextInputStyle.Short)
         .setRequired(true);
 
-      // 追加メンバーID（カンマ/空白区切り）
       const idsInput = new TextInputBuilder()
         .setCustomId('member-ids')
         .setLabel('追加するユーザーID（任意・カンマ/空白区切り）')
@@ -65,10 +80,11 @@ client.on('interactionCreate', async (interaction) => {
         new ActionRowBuilder().addComponents(nameInput),
         new ActionRowBuilder().addComponents(idsInput),
       );
+
       return interaction.showModal(modal);
     }
 
-    // モーダル送信：チャンネル作成
+    // モーダル送信 → チャンネル作成
     if (interaction.isModalSubmit() && interaction.customId === 'channel-request-modal') {
       await interaction.deferReply({ ephemeral: true });
 
@@ -76,47 +92,38 @@ client.on('interactionCreate', async (interaction) => {
       const rawIds = (interaction.fields.getTextInputValue('member-ids') || '').trim();
 
       const catId = process.env.PRIVATE_CATEGORY_ID?.trim();
-      const modRoleId = process.env.MODERATOR_ROLE_ID?.trim();
-
-      // 環境変数チェック
       if (!catId) return interaction.editReply('環境変数 PRIVATE_CATEGORY_ID が未設定です。');
-      if (!modRoleId) return interaction.editReply('環境変数 MODERATOR_ROLE_ID が未設定です。');
 
-      // カテゴリ/ロールの存在検証
       const cat = interaction.guild.channels.cache.get(catId);
       if (!cat || cat.type !== ChannelType.GuildCategory) {
         return interaction.editReply('PRIVATE_CATEGORY_ID がカテゴリではありません。');
       }
-      const modRole = interaction.guild.roles.cache.get(modRoleId);
-      if (!modRole) {
-        return interaction.editReply('MODERATOR_ROLE_ID のロールが見つかりません。');
-      }
 
-      // 追加メンバーIDを整形（数字のみ/18〜19桁相当のDiscord雪だるまIDを想定）
+      // 追加メンバーIDを整形
       const extraUserIds = rawIds.length
         ? rawIds
             .split(/[\s,、]+/)
             .map(s => s.trim())
             .filter(Boolean)
-            .filter(id => /^\d{17,21}$/.test(id)) // ざっくりバリデーション
-            .filter(id => id !== interaction.user.id) // 重複防止（申請者は別で許可するため）
+            .filter(id => /^\d{17,21}$/.test(id)) // IDっぽいものだけ
+            .filter(id => id !== interaction.user.id)
         : [];
 
-      // permissionOverwrites を安全に構築
+      // ===== 権限設定 =====
       const permissionOverwrites = [
         { id: interaction.guild.roles.everyone.id, deny:  [PermissionsBitField.Flags.ViewChannel] },
         { id: interaction.user.id,                  allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] },
-        { id: modRole.id,                           allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] },
         ...extraUserIds.map(uid => ({
           id: uid,
           allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages],
         })),
       ];
 
+      // ===== チャンネル作成 =====
       const channel = await interaction.guild.channels.create({
         name: channelName,
         type: ChannelType.GuildText,
-        parent: catId,                 // 文字列IDをそのまま
+        parent: catId,
         permissionOverwrites,
       });
 
@@ -132,4 +139,5 @@ client.on('interactionCreate', async (interaction) => {
   }
 });
 
+// ===== Login =====
 client.login(process.env.DISCORD_TOKEN);
