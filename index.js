@@ -96,10 +96,10 @@ client.on('interactionCreate', async (interaction) => {
 
       const idsInput = new TextInputBuilder()
         .setCustomId('member-ids')
-        .setLabel('追加ユーザー（@mention / 数値ID / ハンドル名、カンマ/空白区切り）')
+        .setLabel('追加ユーザー（@mention、ユーザーID、カンマ/空白区切り）')
         .setStyle(TextInputStyle.Paragraph)
         .setRequired(false)
-        .setPlaceholder('@tangdoufu0703, 123456789012345678, Miku');
+        .setPlaceholder('@userA, @userB, 123456789012345678');
 
       modal.addComponents(
         new ActionRowBuilder().addComponents(nameInput),
