@@ -18,14 +18,14 @@ dotenv.config();
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.GuildMembers,   // ← 追加ユーザー検証に必須
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
   ],
   partials: [Partials.Channel],
 });
 
-// ===== Keepalive用（公開不要） =====
+// ===== Keepalive（Northflank用） =====
 const app = express();
 app.get('/keepalive', (_, res) => res.send('ok'));
 app.listen(process.env.PORT || 3000, () => console.log('Keepalive server running'));
@@ -35,7 +35,7 @@ client.once('ready', () => {
   console.log(`✅ Logged in as ${client.user.tag}`);
 });
 
-// ===== 管理者が設置するコマンド =====
+// ===== 管理者設置用コマンド =====
 client.on('messageCreate', async (message) => {
   if (message.content === '!setup-button') {
     if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) return;
@@ -99,21 +99,33 @@ client.on('interactionCreate', async (interaction) => {
         return interaction.editReply('PRIVATE_CATEGORY_ID がカテゴリではありません。');
       }
 
-      // 追加メンバーIDを整形
-      const extraUserIds = rawIds.length
+      // ===== ユーザーID整形 =====
+      const requestedIds = rawIds
         ? rawIds
             .split(/[\s,、]+/)
-            .map(s => s.trim())
+            .map(s => s.replace(/[<@!>]/g, '').trim())  // <@123> 形式にも対応
             .filter(Boolean)
-            .filter(id => /^\d{17,21}$/.test(id)) // IDっぽいものだけ
+            .filter(id => /^\d{17,21}$/.test(id))
             .filter(id => id !== interaction.user.id)
         : [];
+
+      // ===== ギルドで存在確認 =====
+      let validMemberIds = [];
+      if (requestedIds.length) {
+        const results = await Promise.allSettled(
+          requestedIds.map(id => interaction.guild.members.fetch(id))
+        );
+        validMemberIds = results
+          .filter(r => r.status === 'fulfilled')
+          .map(r => r.value.user.id);
+      }
+      const invalidIds = requestedIds.filter(id => !validMemberIds.includes(id));
 
       // ===== 権限設定 =====
       const permissionOverwrites = [
         { id: interaction.guild.roles.everyone.id, deny:  [PermissionsBitField.Flags.ViewChannel] },
-        { id: interaction.user.id,                  allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] },
-        ...extraUserIds.map(uid => ({
+        { id: interaction.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] },
+        ...validMemberIds.map(uid => ({
           id: uid,
           allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages],
         })),
@@ -127,7 +139,12 @@ client.on('interactionCreate', async (interaction) => {
         permissionOverwrites,
       });
 
-      await interaction.editReply(`✅ チャンネル <#${channel.id}> を作成しました。`);
+      // ===== レスポンス =====
+      await interaction.editReply(
+        `✅ チャンネル <#${channel.id}> を作成しました。\n` +
+        (validMemberIds.length ? `追加メンバー: ${validMemberIds.map(id => `<@${id}>`).join(', ')}` : '追加メンバー: なし') +
+        (invalidIds.length ? `\n⚠️ サーバーに存在しない/不正なID: ${invalidIds.join(', ')}` : '')
+      );
     }
   } catch (e) {
     console.error(e);
